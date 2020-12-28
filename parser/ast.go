@@ -130,6 +130,7 @@ type EdgeNode struct {
 	Left      string
 	Right     string
 	Direction string
+	Text      string
 }
 
 func (EdgeNode) IsNode() {}

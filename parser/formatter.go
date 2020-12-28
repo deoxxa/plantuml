@@ -56,7 +56,11 @@ func formatNode(n Node, wr io.Writer, indent string) error {
 			fmt.Fprintf(wr, "\n")
 		}
 	case EdgeNode:
-		fmt.Fprintf(wr, "%s%s %s %s\n", indent, n.Left, n.Direction, n.Right)
+		fmt.Fprintf(wr, "%s%s %s %s", indent, n.Left, n.Direction, n.Right)
+		if n.Text != "" {
+			fmt.Fprintf(wr, " : %s", n.Text)
+		}
+		fmt.Fprintf(wr, "\n")
 	}
 
 	return nil

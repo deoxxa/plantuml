@@ -21,7 +21,7 @@ const simpleCode = `
                state  "Exit Condition 2" as StateB_X2 : is(FieldB, 'value-d') AND FieldD > 0
   }
   [*] --> Begin
-  Begin    --> StateB
+  Begin    --> StateB : FieldE == 0
   @enduml
 `
 
@@ -38,7 +38,7 @@ const simpleCodeFormatted = `@startuml
   }
 
   [*] --> Begin
-  Begin --> StateB
+  Begin --> StateB : FieldE == 0
 @enduml
 `
 
@@ -83,7 +83,7 @@ func TestTokeniser(t *testing.T) {
 		i++
 	}
 
-	a.Equal(55, i)
+	a.Equal(56, i)
 }
 
 func BenchmarkTokeniser(b *testing.B) {

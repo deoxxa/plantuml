@@ -230,11 +230,14 @@ func parseEdgeNode(s *scanner) (*EdgeNode, error) {
 	}
 	node.Right = rightNode.str
 
-	return &node, nil
-}
+	trailing := getToken(s)
+	if trailing.typ != tokenTypeTrailing {
+		s.moveTo(trailing)
+	} else {
+		node.Text = trailing.str
+	}
 
-func ParseDocument(source string) (*DocumentNode, error) {
-	return parseDocument(&scanner{d: []byte(source)})
+	return &node, nil
 }
 
 func parseDocument(s *scanner) (*DocumentNode, error) {
@@ -293,4 +296,8 @@ loop:
 	}
 
 	return nil, fmt.Errorf("parseDocument: couldn't find @enduml token")
+}
+
+func ParseDocument(source string) (*DocumentNode, error) {
+	return parseDocument(&scanner{d: []byte(source)})
 }
