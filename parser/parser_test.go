@@ -14,6 +14,8 @@ const simpleCode = `
   skinparam     Param1 Value1
   skinparam Param2   Value2
   state "begin" as    Begin <<sdlreceive>> {
+    state "Entry Condition 1" as Begin_E1 : FieldA == 0
+    ---
     state   "Exit Condition 1" as     Begin_X1 : FieldA != 0
   }
   state "state-b" as StateB {
@@ -30,6 +32,8 @@ const simpleCodeFormatted = `@startuml
   skinparam Param2 Value2
 
   state "begin" as Begin {
+    state "Entry Condition 1" as Begin_E1 : FieldA == 0
+    ---
     state "Exit Condition 1" as Begin_X1 : FieldA != 0
   }
   state "state-b" as StateB {
@@ -83,7 +87,7 @@ func TestTokeniser(t *testing.T) {
 		i++
 	}
 
-	a.Equal(56, i)
+	a.Equal(64, i)
 }
 
 func BenchmarkTokeniser(b *testing.B) {

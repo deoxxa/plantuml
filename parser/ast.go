@@ -141,3 +141,7 @@ type SkinParamNode struct {
 }
 
 func (SkinParamNode) IsNode() {}
+
+type SeparatorNode struct{}
+
+func (SeparatorNode) IsNode() {}

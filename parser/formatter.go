@@ -41,7 +41,7 @@ func formatNode(n Node, wr io.Writer, indent string) error {
 			var lastType string
 			for _, c := range n.Children {
 				t := fmt.Sprintf("%T", c)
-				if t != lastType && lastType != "" {
+				if t != lastType && lastType != "" && t != "parser.SeparatorNode" && lastType != "parser.SeparatorNode" {
 					fmt.Fprintf(wr, "\n")
 				}
 				lastType = t
@@ -61,6 +61,10 @@ func formatNode(n Node, wr io.Writer, indent string) error {
 			fmt.Fprintf(wr, " : %s", n.Text)
 		}
 		fmt.Fprintf(wr, "\n")
+	case SeparatorNode:
+		fmt.Fprintf(wr, "%s---\n", indent)
+	default:
+		fmt.Fprintf(wr, "UNRECOGNISED NODE TYPE: %T\n", n)
 	}
 
 	return nil

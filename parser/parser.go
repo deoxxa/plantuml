@@ -185,6 +185,8 @@ func parseStateNode(s *scanner) (*StateNode, error) {
 		switch tk.str {
 		case "}":
 			return &node, nil
+		case "---":
+			node.Children = append(node.Children, SeparatorNode{})
 		case "state":
 			s.moveTo(tk)
 
