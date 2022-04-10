@@ -1,0 +1,19 @@
+@startuml
+
+skinparam Param1 Value1
+skinparam Param2 Value2
+
+state "begin" as Begin {
+  state "Entry Condition 1" as Begin_E1 : FieldA == 0
+  ---
+  state "Exit Condition 1" as Begin_X1 : FieldA != 0
+}
+state "state-b" as StateB {
+  state "Exit Condition 1" as StateB_X1 : is(FieldB, 'value-a', 'value-v', 'value-c') AND !empty(FieldC)
+  state "Exit Condition 2" as StateB_X2 : is(FieldB, 'value-d') AND FieldD > 0
+}
+
+[*] --> Begin
+Begin --> StateB : FieldE == 0
+
+@enduml

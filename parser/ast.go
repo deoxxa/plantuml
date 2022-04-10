@@ -145,3 +145,65 @@ func (SkinParamNode) IsNode() {}
 type SeparatorNode struct{}
 
 func (SeparatorNode) IsNode() {}
+
+type NoteNode struct {
+	Floating bool
+	Position string
+	Content  string
+}
+
+func (NoteNode) IsNode() {}
+
+type PartitionNode struct {
+	Label    string
+	Children []Node
+}
+
+func (PartitionNode) IsNode() {}
+
+type IfNode struct {
+	Condition  Node
+	Value      Node
+	Statements []Node
+	Else       Node
+}
+
+func (IfNode) IsNode() {}
+
+type ElseNode struct {
+	Condition  Node
+	Value      Node
+	Statements []Node
+	Else       Node
+}
+
+func (ElseNode) IsNode() {}
+
+type ParenthesisNode struct {
+	Content string
+}
+
+func (ParenthesisNode) IsNode() {}
+
+type ForkNode struct {
+	IsAgain    bool
+	Statements []Node
+	ForkAgain  Node
+}
+
+func (ForkNode) IsNode() {}
+
+type ActionNode struct {
+	Colour  string
+	Content string
+}
+
+func (ActionNode) IsNode() {}
+
+type StartNode struct{}
+
+func (StartNode) IsNode() {}
+
+type EndNode struct{}
+
+func (EndNode) IsNode() {}

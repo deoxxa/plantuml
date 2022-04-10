@@ -1,0 +1,45 @@
+@startuml
+
+skinparam MovingData_DocumentType InputOutputProcessV1
+
+floating note
+  Orange is operating on output parameters
+  Green is operating on internal values
+  Blue is evaluating a condition
+  Red is an error
+endnote
+note left
+  a
+endnote
+note right
+  b
+endnote
+
+partition "SLC Access and Network Estimates" {
+  start
+
+  :Parameters;
+
+  note left
+      Input
+      Completed boolean
+      DeviceBandwidth ?number
+      ESABandwidth ?number
+      InconclusiveResults boolean
+      FibreShortfall ?number
+      ConduitShortfall ?number
+      ManualAssessment boolean
+      RequestedBandwidth number
+      ESAGreen boolean
+  endnote
+  note right
+      Output
+      SEPCombined string
+      SEPCustomer string
+      SEPNetwork string
+      SLCCustomer ?number
+      SLCNetwork ?number
+  endnote
+}
+
+@enduml

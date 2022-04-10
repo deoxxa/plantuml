@@ -1,0 +1,138 @@
+@startuml
+
+skinparam MovingData_DocumentType InputOutputProcessV1
+
+floating note
+  Orange is operating on output parameters
+  Green is operating on internal values
+  Blue is evaluating a condition
+  Red is an error
+endnote
+
+partition "SLC Access and Network Estimates" {
+  start
+
+  :Parameters;
+
+  note left
+    Input
+    Completed boolean
+    DeviceBandwidth ?number
+    InconclusiveResults boolean
+    FibreShortfall ?number
+    ConduitShortfall ?number
+    ManualAssessment boolean
+    RequestedBandwidth number
+    ESAWidebandGuaranteed boolean
+    ESAWidebandRemote boolean
+  endnote
+
+  note right
+    Output
+    SEPCombined "not-ready" OR "green" OR "amber" OR "red"
+    SEPCustomer "not-ready" OR "green" OR "amber" OR "red"
+    SEPNetwork "not-ready" OR "green" OR "amber" OR "red"
+    SLCCustomer ?number
+    SLCNetwork ?number
+  endnote
+
+  partition "Inconclusive" {
+    if (InconclusiveResults) then (true)
+      #Orange:SEPCombined = "red"
+      SEPCustomer = "red"
+      SEPNetwork = "amber"
+      SLCCustomer = undefined
+      SLCNetwork = undefined;
+      end
+    else (false)
+    endif
+  }
+
+  partition "Incomplete" {
+    if (Completed) then (true)
+      #Orange:SEPCombined = "not-ready"
+      SEPCustomer = "not-ready"
+      SEPNetwork = "not-ready"
+      SLCCustomer = undefined
+      SLCNetwork = undefined;
+      end
+    else (false)
+    endif
+  }
+
+  partition "Calculate/Infer Available Bandwidth" {
+    #LightGreen:var availableBandwidth number;
+
+    if (ESAWidebandGuaranteed) then (true)
+      #LightGreen:availableBandwidth = 100000000;
+    else if (DeviceBandwidth is defined) then (true)
+      #LightGreen:availableBandwidth = DeviceBandwidth;
+    else (false)
+      #LightGreen:availableBandwidth = 0;
+    endif
+  }
+
+  partition "Calculate/Infer Physical Shortfalls" {
+    #LightGreen:var fibreShortfall number
+    var conduitShortfall number;
+
+    if (DeviceBandwidth is defined AND DeviceBandwidth >= RequestedBandwidth) then (true)
+      #LightGreen:fibreShortfall = 0
+      conduitShortfall = 0;
+    else if (FibreShortfall is defined AND ConduitShortfall is defined) then (true)
+      #LightGreen:fibreShortfall = FibreShortfall
+      conduitShortfall = ConduitShortfall;
+    else (false)
+      #Orange:SEPCombined = "not-ready"
+      SEPCustomer = "not-ready"
+      SEPNetwork = "not-ready"
+      SLCCustomer = undefined
+      SLCNetwork = undefined;
+      end
+    endif
+  }
+
+  partition "Check for impossible values" {
+    if (fibreShortfall < 0 OR conduitShortfall < 0) then (true)
+      #Red:Shortfalls can not be negative;
+      end
+    endif
+  }
+
+  if (fibreShortfall == 0 AND conduitShortfall == 0) then (true)
+    #Orange:SEPCustomer = "green"
+    SLCCustomer = 0;
+  else (false)
+    fork
+      #LightBlue:fibreShortfall <= 500 AND conduitShortfall <= 70;
+      #Orange:SEPCustomer = "green"
+      SLCCustomer = 0;
+    forkagain
+      #LightBlue:fibreShortfall <= 3000 AND conduitShortfall <= 100;
+      #Orange:SEPCustomer = "amber"
+      SLCCustomer = CalculateFibreSLC(false, max(conduitShortfall - 70, 0), max(fibreShortfall - 500, 0));
+    forkagain
+      #LightBlue:fibreShortfall > 3000 OR conduitShortfall > 70;
+      #Orange:SEPCustomer = "red"
+      SLCCustomer = undefined;
+    forkagain
+      #Red:Shortfalls did not fit defined thresholds;
+      end
+    endfork
+  endif
+
+  if (ESAWidebandRemote) then (true)
+    #Orange:SLCNetwork = undefined
+    SEPNetwork = "red";
+  else if (RequestedBandwidth <= availableBandwidth) then (true)
+    #Orange:SLCNetwork = 0
+    SEPNetwork = "green";
+  else (false)
+    #Orange:SLCNetwork = undefined
+    SEPNetwork = "amber";
+  endif
+
+  end
+}
+
+@enduml

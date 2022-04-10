@@ -47,6 +47,17 @@ func (s *scanner) wsnl() {
 	}
 }
 
+func (s *scanner) nl() {
+	for !s.eof() {
+		switch s.peek() {
+		case '\r', '\n':
+			s.move(1)
+		default:
+			return
+		}
+	}
+}
+
 func (s *scanner) lc(p int) [2]int {
 	b := s.d[0:p]
 
