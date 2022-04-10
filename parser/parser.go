@@ -834,7 +834,7 @@ func parseDocument(s *scanner) (*DocumentNode, error) {
 	s.wsnl()
 
 	startToken := getToken(s, nil)
-	if startToken.str != "@startuml" {
+	if startToken == nil || startToken.str != "@startuml" {
 		return nil, s.err(fmt.Errorf("parseDocument: first token should be @startuml"))
 	}
 

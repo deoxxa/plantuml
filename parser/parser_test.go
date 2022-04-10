@@ -68,7 +68,7 @@ func TestTokeniser(t *testing.T) {
     i++
   }
 
-  a.Equal(64, i)
+  a.Equal(63, i)
 }
 
 func BenchmarkTokeniser(b *testing.B) {
@@ -103,8 +103,8 @@ func TestFormatter(t *testing.T) {
     name          string
     input, output []byte
   }{
-    // {"simple", simpleCode, simpleCodeFormatted},
-    // {"complex", complexCode, complexCodeFormatted},
+    {"simple", readTestFile("simple-code-1-input.uml"), readTestFile("simple-code-1-formatted.uml")},
+    {"complex", readTestFile("complex-code-1-input.uml"), readTestFile("complex-code-1-formatted.uml")},
     {"complex2", readTestFile("complex-code-2-input.uml"), readTestFile("complex-code-2-formatted.uml")},
   } {
     t.Run(e.name, func(t *testing.T) {

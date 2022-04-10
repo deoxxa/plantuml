@@ -2,6 +2,7 @@ package parser
 
 import (
 	"strings"
+	"fmt"
 )
 
 type Node interface {
@@ -207,3 +208,96 @@ func (StartNode) IsNode() {}
 type EndNode struct{}
 
 func (EndNode) IsNode() {}
+
+func Walk(n Node, fn func(n Node) error) error {
+	if err := fn(n); err != nil {
+		return err
+	}
+
+	switch n := n.(type) {
+	case DocumentNode:
+		for _, nn := range n.Nodes {
+			if err := Walk(nn, fn); err != nil {
+				return err
+			}
+		}
+	case CommentNode:
+	case StateNode:
+		for _, nn := range n.Children {
+			if err := Walk(nn, fn); err != nil {
+				return err
+			}
+		}
+	case EdgeNode:
+	case SkinParamNode:
+	case SeparatorNode:
+	case NoteNode:
+	case PartitionNode:
+		for _, nn := range n.Children {
+			if err := Walk(nn, fn); err != nil {
+				return err
+			}
+		}
+	case IfNode:
+		if n.Condition != nil {
+			if err := Walk(n.Condition, fn); err != nil {
+				return err
+			}
+		}
+		if n.Value != nil {
+			if err := Walk(n.Value, fn); err != nil {
+				return err
+			}
+		}
+		for _, nn := range n.Statements {
+			if err := Walk(nn, fn); err != nil {
+				return err
+			}
+		}
+		if n.Else != nil {
+			if err := Walk(n.Else, fn); err != nil {
+				return err
+			}
+		}
+	case ElseNode:
+		if n.Condition != nil {
+			if err := Walk(n.Condition, fn); err != nil {
+				return err
+			}
+		}
+		if n.Value != nil {
+			if err := Walk(n.Value, fn); err != nil {
+				return err
+			}
+		}
+		for _, nn := range n.Statements {
+			if err := Walk(nn, fn); err != nil {
+				return err
+			}
+		}
+		if n.Else != nil {
+			if err := Walk(n.Else, fn); err != nil {
+				return err
+			}
+		}
+	case ParenthesisNode:
+	case ForkNode:
+		for _, nn := range n.Statements {
+			if err := Walk(nn, fn); err != nil {
+				return err
+			}
+		}
+		if n.ForkAgain != nil {
+			if err := Walk(n.ForkAgain, fn); err != nil {
+				return err
+			}
+		}
+	case ActionNode:
+	case StartNode:
+	case EndNode:
+	default:
+		return fmt.Errorf("invalid node type %T", n)
+	}
+
+	return nil
+}
