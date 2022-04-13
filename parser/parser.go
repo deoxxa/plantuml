@@ -710,6 +710,17 @@ func parseForkNode(s *scanner) (*ForkNode, error) {
 			return &node, nil
 		case tk.str == "end":
 			node.Statements = append(node.Statements, EndNode{})
+		case tk.str == "partition":
+			s.moveTo(tk)
+
+			partitionNode, err := parsePartitionNode(s)
+			if err != nil {
+				return nil, err
+			}
+
+			if partitionNode != nil {
+				node.Statements = append(node.Statements, *partitionNode)
+			}
 		case tk.str == "if":
 			s.moveTo(tk)
 

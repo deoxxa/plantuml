@@ -16,52 +16,49 @@ partition "SLC Access and Network Estimates" {
 
   note left
     Input
-    Completed boolean
-    DeviceBandwidth ?number
+    CompletedAt ?time
+    DeviceBandwidth ?integer
     InconclusiveResults boolean
-    FibreShortfall ?number
-    ConduitShortfall ?number
+    FibreShortfall ?float
+    ConduitShortfall ?float
     ManualAssessment boolean
-    RequestedBandwidth number
+    RequestedBandwidth integer
     ESAWidebandGuaranteed boolean
     ESAWidebandRemote boolean
   endnote
 
   note right
     Output
-    SEPCombined "not-ready" OR "green" OR "amber" OR "red"
     SEPCustomer "not-ready" OR "green" OR "amber" OR "red"
     SEPNetwork "not-ready" OR "green" OR "amber" OR "red"
-    SLCCustomer ?number
-    SLCNetwork ?number
+    SLCCustomer ?float
+    SLCNetwork ?float
   endnote
 
   partition "Inconclusive" {
     if (InconclusiveResults) then (true)
-      #Orange:SEPCombined = "red"
-      SEPCustomer = "red"
+      #Orange:SEPCustomer = "red"
       SEPNetwork = "amber"
-      SLCCustomer = undefined
-      SLCNetwork = undefined;
+      SLCCustomer = null
+      SLCNetwork = null;
       end
     else (false)
     endif
   }
 
   partition "Incomplete" {
-    if (Completed) then (true)
-      #Orange:SEPCombined = "not-ready"
-      SEPCustomer = "not-ready"
+    if (CompletedAt is defined) then (true)
+      #Orange:SEPCustomer = "not-ready"
       SEPNetwork = "not-ready"
-      SLCCustomer = undefined
-      SLCNetwork = undefined;
+      SLCCustomer = null
+      SLCNetwork = null;
       end
     else (false)
     endif
   }
 
   partition "Calculate/Infer Available Bandwidth" {
-    #LightGreen:var availableBandwidth number;
+    #LightGreen:var availableBandwidth integer;
 
     if (ESAWidebandGuaranteed) then (true)
       #LightGreen:availableBandwidth = 100000000;
@@ -73,8 +70,8 @@ partition "SLC Access and Network Estimates" {
   }
 
   partition "Calculate/Infer Physical Shortfalls" {
-    #LightGreen:var fibreShortfall number
-    var conduitShortfall number;
+    #LightGreen:var fibreShortfall integer
+    var conduitShortfall integer;
 
     if (DeviceBandwidth is defined AND DeviceBandwidth >= RequestedBandwidth) then (true)
       #LightGreen:fibreShortfall = 0
@@ -83,11 +80,10 @@ partition "SLC Access and Network Estimates" {
       #LightGreen:fibreShortfall = FibreShortfall
       conduitShortfall = ConduitShortfall;
     else (false)
-      #Orange:SEPCombined = "not-ready"
-      SEPCustomer = "not-ready"
+      #Orange:SEPCustomer = "not-ready"
       SEPNetwork = "not-ready"
-      SLCCustomer = undefined
-      SLCNetwork = undefined;
+      SLCCustomer = null
+      SLCNetwork = null;
       end
     endif
   }
@@ -109,26 +105,132 @@ partition "SLC Access and Network Estimates" {
       SLCCustomer = 0;
     forkagain
       #LightBlue:fibreShortfall <= 3000 AND conduitShortfall <= 100;
+
+      partition "Calculate Conduit SLC" {
+        #LightGreen:var conduitSLC integer
+        var conduitExcess integer
+        conduitExcess = conduitShortfall - 70;
+
+        if (conduitExcess > 0 && conduitExcess <= 100) then (true)
+          if (conduitExcess <= 20) then (true)
+            #LightGreen:conduitSLC = 3089;
+          else if (conduitExcess <= 50) then (true)
+            #LightGreen:conduitSLC = 3650;
+          else if (conduitExcess <= 100) then (true)
+            #LightGreen:conduitSLC = 4493;
+          endif
+        endif
+      }
+
+      partition "Calculate Fibre SLC" {
+        #LightGreen:var fibreSLC integer
+        var fibreExcess integer
+        fibreExcess = fibreShortfall - 500;
+
+        if (fibreExcess > 0 && fibreExcess <= 1000) then (true)
+          if (fibreExcess <= 20) then (true)
+            #LightGreen:fibreSLC = 3089;
+          else if (fibreExcess <= 50) then (true)
+            #LightGreen:fibreSLC = 3650;
+          else if (fibreExcess <= 100) then (true)
+            #LightGreen:fibreSLC = 4493;
+          else if (fibreExcess <= 150) then (true)
+            #LightGreen:fibreSLC = 4914;
+          else if (fibreExcess <= 200) then (true)
+            #LightGreen:fibreSLC = 5616;
+          else if (fibreExcess <= 250) then (true)
+            #LightGreen:fibreSLC = 6318;
+          else if (fibreExcess <= 300) then (true)
+            #LightGreen:fibreSLC = 7020;
+          else if (fibreExcess <= 400) then (true)
+            #LightGreen:fibreSLC = 8564;
+          else if (fibreExcess <= 500) then (true)
+            #LightGreen:fibreSLC = 10670;
+          else if (fibreExcess <= 600) then (true)
+            #LightGreen:fibreSLC = 12215;
+          else if (fibreExcess <= 700) then (true)
+            #LightGreen:fibreSLC = 13619;
+          else if (fibreExcess <= 800) then (true)
+            #LightGreen:fibreSLC = 15865;
+          else if (fibreExcess <= 900) then (true)
+            #LightGreen:fibreSLC = 17269;
+          else if (fibreExcess <= 1000) then (true)
+            #LightGreen:fibreSLC = 19516;
+          endif
+        else (false)
+        endif
+
+        if (fibreExcess > 1000 && fibreExcess <= 2000) then (true)
+          if (fibreExcess <= 1100) then (true)
+            #LightGreen:fibreSLC = 20920;
+          else if (fibreExcess <= 1200) then (true)
+            #LightGreen:fibreSLC = 22913;
+          else if (fibreExcess <= 1300) then (true)
+            #LightGreen:fibreSLC = 24621;
+          else if (fibreExcess <= 1400) then (true)
+            #LightGreen:fibreSLC = 26395;
+          else if (fibreExcess <= 1500) then (true)
+            #LightGreen:fibreSLC = 28170;
+          else if (fibreExcess <= 1600) then (true)
+            #LightGreen:fibreSLC = 29945;
+          else if (fibreExcess <= 1700) then (true)
+            #LightGreen:fibreSLC = 31719;
+          else if (fibreExcess <= 1800) then (true)
+            #LightGreen:fibreSLC = 33494;
+          else if (fibreExcess <= 1900) then (true)
+            #LightGreen:fibreSLC = 35268;
+          else if (fibreExcess <= 2000) then (true)
+            #LightGreen:fibreSLC = 37043;
+          endif
+        else (false)
+        endif
+
+        if (fibreExcess > 2000 && fibreExcess <= 3000) then (true)
+          if (fibreExcess <= 2100) then (true)
+            #LightGreen:fibreSLC = 38818;
+          else if (fibreExcess <= 2200) then (true)
+            #LightGreen:fibreSLC = 40592;
+          else if (fibreExcess <= 2300) then (true)
+            #LightGreen:fibreSLC = 42367;
+          else if (fibreExcess <= 2400) then (true)
+            #LightGreen:fibreSLC = 44142;
+          else if (fibreExcess <= 2500) then (true)
+            #LightGreen:fibreSLC = 45916;
+          else if (fibreExcess <= 2600) then (true)
+            #LightGreen:fibreSLC = 47691;
+          else if (fibreExcess <= 2700) then (true)
+            #LightGreen:fibreSLC = 49466;
+          else if (fibreExcess <= 2800) then (true)
+            #LightGreen:fibreSLC = 51240;
+          else if (fibreExcess <= 2900) then (true)
+            #LightGreen:fibreSLC = 53015;
+          else if (fibreExcess <= 3000) then (true)
+            #LightGreen:fibreSLC = 54790;
+          endif
+        else (false)
+        endif
+      }
+
       #Orange:SEPCustomer = "amber"
-      SLCCustomer = CalculateFibreSLC(false, max(conduitShortfall - 70, 0), max(fibreShortfall - 500, 0));
+      SLCCustomer = conduitSLC + fibreSLC;
     forkagain
       #LightBlue:fibreShortfall > 3000 OR conduitShortfall > 70;
       #Orange:SEPCustomer = "red"
-      SLCCustomer = undefined;
+      SLCCustomer = null;
     forkagain
       #Red:Shortfalls did not fit defined thresholds;
       end
     endfork
   endif
 
-  if (ESAWidebandRemote) then (true)
-    #Orange:SLCNetwork = undefined
+  if (ESAWidebandRemote == true) then (true)
+    #Orange:SLCNetwork = null
     SEPNetwork = "red";
   else if (RequestedBandwidth <= availableBandwidth) then (true)
     #Orange:SLCNetwork = 0
     SEPNetwork = "green";
   else (false)
-    #Orange:SLCNetwork = undefined
+    #Orange:SLCNetwork = null
     SEPNetwork = "amber";
   endif
 
