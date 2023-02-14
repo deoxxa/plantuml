@@ -68,7 +68,7 @@ func TestTokeniser(t *testing.T) {
     i++
   }
 
-  a.Equal(63, i)
+  a.Equal(64, i)
 }
 
 func BenchmarkTokeniser(b *testing.B) {
@@ -96,6 +96,59 @@ func BenchmarkParser(b *testing.B) {
   for i := 0; i < b.N; i++ {
     parseDocument(&scanner{d: readTestFile("simple-code-1-input.uml")})
   }
+}
+
+func TestParserPositions(t *testing.T) {
+  a := assert.New(t)
+
+  doc, err := parseDocument(&scanner{d: readTestFile("tiny-code.uml")})
+  a.NoError(err)
+  a.NotNil(doc)
+
+  a.Equal(&DocumentNode{
+    BaseNode: BaseNode{
+      SourceRange: SourceRange{
+        Start: SourcePosition{Offset: 0, Line: 1, Column: 1},
+        End:   SourcePosition{Offset: 122, Line: 9, Column: 7},
+      },
+    },
+    Nodes: []Node{
+      SkinParamNode{
+        BaseNode: BaseNode{
+          SourceRange: SourceRange{
+            Start: SourcePosition{Offset: 11, Line: 3, Column: 1},
+            End:   SourcePosition{Offset: 33, Line: 3, Column: 23},
+          },
+        },
+        Name:  "ParamX",
+        Value: "ValueX",
+      },
+      StateNode{
+        BaseNode: BaseNode{
+          SourceRange: SourceRange{
+            Start: SourcePosition{Offset: 36, Line: 5, Column: 1},
+            End:   SourcePosition{Offset: 113, Line: 7, Column: 1},
+          },
+        },
+        Name:       "X_Outer",
+        Label:      "x-outer",
+        Stereotype: "<<sdlreceive>>",
+        Children: []Node{
+          StateNode{
+            BaseNode: BaseNode{
+              SourceRange: SourceRange{
+                Start: SourcePosition{Offset: 82, Line: 6, Column: 3},
+                End:   SourcePosition{Offset: 112, Line: 6, Column: 33},
+              },
+            },
+            Name:  "X_Inner",
+            Label: "x-inner",
+            Text:  "X",
+          },
+        },
+      },
+    },
+  }, doc)
 }
 
 func TestFormatter(t *testing.T) {

@@ -45,13 +45,13 @@ func (t tokenType) String() string {
 }
 
 type token struct {
-	pos int
+	pos [2]int
 	typ tokenType
 	str string
 }
 
 func (t token) String() string {
-	return fmt.Sprintf("token{pos: %d, typ: %s, str: %q}", t.pos, t.typ.String(), t.str)
+	return fmt.Sprintf("token{pos: %v, typ: %s, str: %q}", t.pos, t.typ.String(), t.str)
 }
 
 type options struct {
@@ -68,19 +68,19 @@ func getToken(s *scanner, opts *options) *token {
 	if c := s.peek(); c == '\n' {
 		p := s.p
 		s.move(1)
-		return &token{pos: p, typ: tokenTypeLineEnd}
+		return &token{pos: [2]int{p, p}, typ: tokenTypeLineEnd}
 	}
 
 	if c := s.peek(); c == '#' {
 		p := s.p
 		s.move(1)
-		return &token{pos: p, typ: tokenTypeHash}
+		return &token{pos: [2]int{p, p}, typ: tokenTypeHash}
 	}
 
 	if c := s.peek(); c == ';' {
 		p := s.p
 		s.move(1)
-		return &token{pos: p, typ: tokenTypeSemi}
+		return &token{pos: [2]int{p, p}, typ: tokenTypeSemi}
 	}
 
 	if c := s.peek(); c == ':' {
@@ -101,11 +101,11 @@ func getToken(s *scanner, opts *options) *token {
 				d = append(d, c)
 			}
 
-			return &token{pos: p, typ: tokenTypeTrailing, str: string(d)}
+			return &token{pos: [2]int{p, p + len(d) - 1}, typ: tokenTypeTrailing, str: string(d)}
 		} else {
 			p := s.p
 			s.move(1)
-			return &token{pos: p, typ: tokenTypeColon}
+			return &token{pos: [2]int{p, p}, typ: tokenTypeColon}
 		}
 	}
 
@@ -124,7 +124,7 @@ func getToken(s *scanner, opts *options) *token {
 			d = append(d, c)
 		}
 
-		return &token{pos: p, typ: tokenTypeTerm, str: string(d)}
+		return &token{pos: [2]int{p, p + len(d)}, typ: tokenTypeTerm, str: string(d)}
 	}
 
 	p := s.p
@@ -140,7 +140,7 @@ func getToken(s *scanner, opts *options) *token {
 		d = append(d, c)
 	}
 
-	return &token{pos: p, typ: tokenTypeTerm, str: string(d)}
+	return &token{pos: [2]int{p, p + len(d) - 1}, typ: tokenTypeTerm, str: string(d)}
 }
 
 func readToTerminator(s *scanner, terminator byte, consume bool) (string, bool) {
@@ -172,21 +172,30 @@ func parseSkinParamNode(s *scanner) (*SkinParamNode, error) {
 
 	var node SkinParamNode
 
-	if term := getToken(s, nil); term.str != "skinparam" {
+	s.pushTrackedRange()
+	defer func() {
+		node.SetSourceRange(s.popTrackedRange())
+	}()
+
+	termToken := getToken(s, nil)
+	if termToken.str != "skinparam" {
 		return nil, s.rerr(fmt.Errorf("expected skinparam term token"))
 	}
+	s.trackTokenRange(termToken)
 
-	nameNode := getToken(s, nil)
-	if nameNode.typ != tokenTypeTerm {
+	nameToken := getToken(s, nil)
+	if nameToken.typ != tokenTypeTerm {
 		return nil, s.rerr(fmt.Errorf("expected term token"))
 	}
-	node.Name = nameNode.str
+	s.trackTokenRange(nameToken)
+	node.Name = nameToken.str
 
-	valueNode := getToken(s, nil)
-	if valueNode.typ != tokenTypeTerm {
+	valueToken := getToken(s, nil)
+	if valueToken.typ != tokenTypeTerm {
 		return nil, s.rerr(fmt.Errorf("expected term token"))
 	}
-	node.Value = valueNode.str
+	s.trackTokenRange(valueToken)
+	node.Value = valueToken.str
 
 	return &node, nil
 }
@@ -196,14 +205,22 @@ func parseStateNode(s *scanner) (*StateNode, error) {
 
 	var node StateNode
 
-	if getToken(s, nil).str != "state" {
+	s.pushTrackedRange()
+	defer func() {
+		node.SetSourceRange(s.popTrackedRange())
+	}()
+
+	stateToken := getToken(s, nil)
+	if stateToken.str != "state" {
 		return nil, s.rerr(fmt.Errorf("expected `state'"))
 	}
+	s.trackTokenRange(stateToken)
 
 	nameAndLabelToken := getToken(s, nil)
 	if nameAndLabelToken.typ != tokenTypeTerm {
 		return nil, s.rerr(fmt.Errorf("expected term token"))
 	}
+	s.trackTokenRange(nameAndLabelToken)
 
 	node.Name = nameAndLabelToken.str
 	node.Label = nameAndLabelToken.str
@@ -211,14 +228,18 @@ func parseStateNode(s *scanner) (*StateNode, error) {
 	asOrBraceOrEndToken := getToken(s, &options{parseTrailing: true})
 
 	if asOrBraceOrEndToken.str == "as" {
+		s.trackTokenRange(asOrBraceOrEndToken)
+
 		nameToken := getToken(s, nil)
 		if nameToken.typ != tokenTypeTerm {
 			return nil, s.rerr(fmt.Errorf("expected term token"))
 		}
+		s.trackTokenRange(nameToken)
 
 		node.Name = nameToken.str
 
 		if stereotypeToken := getToken(s, &options{parseTrailing: true}); stereotypeToken.str == "<<sdlreceive>>" {
+			s.trackTokenRange(stereotypeToken)
 			node.Stereotype = stereotypeToken.str
 			asOrBraceOrEndToken = getToken(s, &options{parseTrailing: true})
 		} else {
@@ -227,11 +248,13 @@ func parseStateNode(s *scanner) (*StateNode, error) {
 	}
 
 	if asOrBraceOrEndToken.typ == tokenTypeTrailing {
+		s.trackTokenRange(asOrBraceOrEndToken)
 		node.Text = asOrBraceOrEndToken.str
 		asOrBraceOrEndToken = getToken(s, nil)
 	}
 
 	if asOrBraceOrEndToken.typ == tokenTypeLineEnd {
+		s.trackTokenRange(asOrBraceOrEndToken)
 		return &node, nil
 	}
 
@@ -246,8 +269,10 @@ func parseStateNode(s *scanner) (*StateNode, error) {
 
 		switch tk.str {
 		case "}":
+			s.trackTokenRange(tk)
 			return &node, nil
 		case "---":
+			s.trackTokenRange(tk)
 			node.Children = append(node.Children, SeparatorNode{})
 		case "state":
 			s.moveTo(tk)
@@ -273,32 +298,41 @@ func parseEdgeNode(s *scanner) (*EdgeNode, error) {
 
 	var node EdgeNode
 
-	leftNode := getToken(s, nil)
-	if leftNode == nil || leftNode.typ != tokenTypeTerm {
-		return nil, s.rerr(fmt.Errorf("expected term token"))
-	}
-	node.Left = leftNode.str
+	s.pushTrackedRange()
+	defer func() {
+		node.SetSourceRange(s.popTrackedRange())
+	}()
 
-	arrowNode := getToken(s, nil)
-	if arrowNode == nil || arrowNode.typ != tokenTypeTerm {
+	leftToken := getToken(s, nil)
+	if leftToken == nil || leftToken.typ != tokenTypeTerm {
 		return nil, s.rerr(fmt.Errorf("expected term token"))
 	}
-	if !strings.HasPrefix(arrowNode.str, "-") || !strings.HasSuffix(arrowNode.str, ">") {
+	s.trackTokenRange(leftToken)
+	node.Left = leftToken.str
+
+	arrowToken := getToken(s, nil)
+	if arrowToken == nil || arrowToken.typ != tokenTypeTerm {
+		return nil, s.rerr(fmt.Errorf("expected term token"))
+	}
+	if !strings.HasPrefix(arrowToken.str, "-") || !strings.HasSuffix(arrowToken.str, ">") {
 		return nil, s.rerr(fmt.Errorf("expected second term to be an arrow"))
 	}
-	node.Direction = arrowNode.str
+	s.trackTokenRange(arrowToken)
+	node.Direction = arrowToken.str
 
-	rightNode := getToken(s, nil)
-	if rightNode == nil || rightNode.typ != tokenTypeTerm {
+	rightToken := getToken(s, nil)
+	if rightToken == nil || rightToken.typ != tokenTypeTerm {
 		return nil, s.rerr(fmt.Errorf("expected term token"))
 	}
-	node.Right = rightNode.str
+	s.trackTokenRange(rightToken)
+	node.Right = rightToken.str
 
-	if trailing := getToken(s, &options{parseTrailing: true}); trailing != nil {
-		if trailing.typ != tokenTypeTrailing {
-			s.moveTo(trailing)
+	if trailingToken := getToken(s, &options{parseTrailing: true}); trailingToken != nil {
+		if trailingToken.typ != tokenTypeTrailing {
+			s.moveTo(trailingToken)
 		} else {
-			node.Text = trailing.str
+			s.trackTokenRange(trailingToken)
+			node.Text = trailingToken.str
 		}
 	}
 
@@ -319,6 +353,11 @@ func parseNoteNode(s *scanner) (*NoteNode, error) {
 	s.savePos()
 
 	var node NoteNode
+
+	s.pushTrackedRange()
+	defer func() {
+		node.SetSourceRange(s.popTrackedRange())
+	}()
 
 	firstLine, ok := readToTerminator(s, '\n', true)
 	if !ok {
@@ -363,6 +402,11 @@ func parsePartitionNode(s *scanner) (*PartitionNode, error) {
 	s.savePos()
 
 	var node PartitionNode
+
+	s.pushTrackedRange()
+	defer func() {
+		node.SetSourceRange(s.popTrackedRange())
+	}()
 
 	if tk := getToken(s, nil); tk == nil || tk.str != "partition" {
 		return nil, s.rerr(fmt.Errorf("expected `partition'"))
@@ -447,6 +491,11 @@ func parseIfNode(s *scanner) (*IfNode, error) {
 	s.savePos()
 
 	var node IfNode
+
+	s.pushTrackedRange()
+	defer func() {
+		node.SetSourceRange(s.popTrackedRange())
+	}()
 
 	if tk := getToken(s, nil); tk == nil || tk.str != "if" {
 		return nil, s.rerr(fmt.Errorf("parseIfNode: expected `if'"))
@@ -560,6 +609,11 @@ func parseElseNode(s *scanner) (*ElseNode, error) {
 	s.savePos()
 
 	var node ElseNode
+
+	s.pushTrackedRange()
+	defer func() {
+		node.SetSourceRange(s.popTrackedRange())
+	}()
 
 	if tk := getToken(s, nil); tk == nil || tk.str != "else" {
 		return nil, s.rerr(fmt.Errorf("parseElseNode: expected `else'"))
@@ -683,11 +737,16 @@ func parseForkNode(s *scanner) (*ForkNode, error) {
 
 	var node ForkNode
 
+	s.pushTrackedRange()
+	defer func() {
+		node.SetSourceRange(s.popTrackedRange())
+	}()
+
 	if tk := getToken(s, nil); tk == nil || (tk.str != "fork" && tk.str != "forkagain") {
 		return nil, s.rerr(fmt.Errorf("parseForkNode: expected `fork' or `forkagain'; got %#v", tk))
 	} else {
 		if tk != nil && tk.str == "forkagain" {
-			node.IsAgain =  true
+			node.IsAgain = true
 		}
 	}
 
@@ -756,6 +815,11 @@ func parseParenthesisNode(s *scanner) (*ParenthesisNode, error) {
 
 	var node ParenthesisNode
 
+	s.pushTrackedRange()
+	defer func() {
+		node.SetSourceRange(s.popTrackedRange())
+	}()
+
 	leftParenthesisCharacter := s.byte()
 	if leftParenthesisCharacter != '(' {
 		return nil, s.rerr(fmt.Errorf("parseParenthesisNode: expected opening parenthesis, got %#v", leftParenthesisCharacter))
@@ -794,6 +858,11 @@ func parseActionNode(s *scanner) (*ActionNode, error) {
 	s.savePos()
 
 	var node ActionNode
+
+	s.pushTrackedRange()
+	defer func() {
+		node.SetSourceRange(s.popTrackedRange())
+	}()
 
 	startToken := getToken(s, nil)
 	if startToken == nil {
@@ -842,12 +911,18 @@ func parseActionNode(s *scanner) (*ActionNode, error) {
 func parseDocument(s *scanner) (*DocumentNode, error) {
 	var doc DocumentNode
 
+	s.pushTrackedRange()
+	defer func() {
+		doc.SetSourceRange(s.popTrackedRange())
+	}()
+
 	s.wsnl()
 
 	startToken := getToken(s, nil)
 	if startToken == nil || startToken.str != "@startuml" {
 		return nil, s.err(fmt.Errorf("parseDocument: first token should be @startuml"))
 	}
+	s.trackTokenRange(startToken)
 
 loop:
 	for !s.eof() {
@@ -857,6 +932,7 @@ loop:
 
 		switch {
 		case tk.str == "@enduml":
+			s.trackTokenRange(tk)
 			return &doc, nil
 		case tk.str == "skinparam":
 			s.moveTo(tk)

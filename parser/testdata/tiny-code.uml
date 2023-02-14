@@ -1,0 +1,9 @@
+@startuml
+
+skinparam ParamX ValueX
+
+state "x-outer" as X_Outer <<sdlreceive>> {
+  state "x-inner" as X_Inner : X
+}
+
+@enduml

@@ -1,15 +1,71 @@
 package parser
 
 import (
-	"strings"
 	"fmt"
+	"strings"
 )
+
+type SourcePosition struct{ Offset, Line, Column int }
+
+func (p SourcePosition) Before(other SourcePosition) bool {
+	return p.Offset < other.Offset
+}
+
+func (p SourcePosition) After(other SourcePosition) bool {
+	return p.Offset > other.Offset
+}
+
+type SourceRange struct{ Start, End SourcePosition }
+
+func MergeRanges(a []SourceRange) SourceRange {
+	if len(a) == 0 {
+		return SourceRange{}
+	}
+
+	var r SourceRange = a[0]
+
+	for _, e := range a {
+		if e.Start.Offset < r.Start.Offset {
+			r.Start = e.Start
+		}
+		if e.End.Offset > r.End.Offset {
+			r.End = e.End
+		}
+	}
+
+	return r
+}
+
+type BaseNode struct {
+	SourceRange SourceRange
+}
+
+func (b BaseNode) GetSourcePosition() SourcePosition {
+	return b.SourceRange.Start
+}
+
+func (b BaseNode) GetSourceRange() SourceRange {
+	return b.SourceRange
+}
+
+func (b *BaseNode) SetSourceRange(sourceRange SourceRange) {
+	b.SourceRange = sourceRange
+}
+
+func (b *BaseNode) SetSourceStart(position SourcePosition) {
+	b.SourceRange.Start = position
+}
+
+func (b *BaseNode) SetSourceEnd(position SourcePosition) {
+	b.SourceRange.End = position
+}
 
 type Node interface {
 	IsNode()
 }
 
 type DocumentNode struct {
+	BaseNode
 	Nodes []Node
 }
 
@@ -79,12 +135,14 @@ func (d DocumentNode) GetSkinParam(name string) string {
 }
 
 type CommentNode struct {
+	BaseNode
 	Content string
 }
 
 func (CommentNode) IsNode() {}
 
 type StateNode struct {
+	BaseNode
 	Name       string
 	Label      string
 	Stereotype string
@@ -128,6 +186,7 @@ func (n StateNode) getChildrenWithPrefix(prefix string) []StateNode {
 }
 
 type EdgeNode struct {
+	BaseNode
 	Left      string
 	Right     string
 	Direction string
@@ -137,17 +196,21 @@ type EdgeNode struct {
 func (EdgeNode) IsNode() {}
 
 type SkinParamNode struct {
+	BaseNode
 	Name  string
 	Value string
 }
 
 func (SkinParamNode) IsNode() {}
 
-type SeparatorNode struct{}
+type SeparatorNode struct {
+	BaseNode
+}
 
 func (SeparatorNode) IsNode() {}
 
 type NoteNode struct {
+	BaseNode
 	Floating bool
 	Position string
 	Content  string
@@ -156,6 +219,7 @@ type NoteNode struct {
 func (NoteNode) IsNode() {}
 
 type PartitionNode struct {
+	BaseNode
 	Label    string
 	Children []Node
 }
@@ -163,6 +227,7 @@ type PartitionNode struct {
 func (PartitionNode) IsNode() {}
 
 type IfNode struct {
+	BaseNode
 	Condition  Node
 	Value      Node
 	Statements []Node
@@ -172,6 +237,7 @@ type IfNode struct {
 func (IfNode) IsNode() {}
 
 type ElseNode struct {
+	BaseNode
 	Condition  Node
 	Value      Node
 	Statements []Node
@@ -181,12 +247,14 @@ type ElseNode struct {
 func (ElseNode) IsNode() {}
 
 type ParenthesisNode struct {
+	BaseNode
 	Content string
 }
 
 func (ParenthesisNode) IsNode() {}
 
 type ForkNode struct {
+	BaseNode
 	IsAgain    bool
 	Statements []Node
 	ForkAgain  Node
@@ -195,17 +263,22 @@ type ForkNode struct {
 func (ForkNode) IsNode() {}
 
 type ActionNode struct {
+	BaseNode
 	Colour  string
 	Content string
 }
 
 func (ActionNode) IsNode() {}
 
-type StartNode struct{}
+type StartNode struct {
+	BaseNode
+}
 
 func (StartNode) IsNode() {}
 
-type EndNode struct{}
+type EndNode struct {
+	BaseNode
+}
 
 func (EndNode) IsNode() {}
 
