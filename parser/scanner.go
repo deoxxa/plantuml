@@ -70,16 +70,20 @@ func (s *scanner) lc(p int) [2]int {
 	return GetLineAndColumnForOffset(s.d, p)
 }
 
-func (s *scanner) tsp(p int) SourcePosition {
+func (s *scanner) sp(p int) SourcePosition {
 	l := s.lc(p)
 	return SourcePosition{Offset: p, Line: l[0], Column: l[1]}
 }
 
-func (s *scanner) tsr(tk *token) SourceRange {
+func (s *scanner) sr(p [2]int) SourceRange {
 	return SourceRange{
-		Start: s.tsp(tk.pos[0]),
-		End:   s.tsp(tk.pos[1]),
+		Start: s.sp(p[0]),
+		End:   s.sp(p[1]),
 	}
+}
+
+func (s *scanner) tsr(tk *token) SourceRange {
+	return s.sr(tk.pos)
 }
 
 func (s *scanner) pushTrackedRange() {
@@ -92,11 +96,14 @@ func (s *scanner) popTrackedRange() SourceRange {
 	return MergeRanges(a)
 }
 
-func (s *scanner) trackTokenRange(tk *token) {
-	r := s.tsr(tk)
+func (s *scanner) trackRange(r SourceRange) {
 	for i := range s.a {
 		s.a[i] = append(s.a[i], r)
 	}
+}
+
+func (s *scanner) trackTokenRange(tk *token) {
+	s.trackRange(s.tsr(tk))
 }
 
 func (s *scanner) err(err error) error {

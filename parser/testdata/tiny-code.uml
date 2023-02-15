@@ -2,8 +2,24 @@
 
 skinparam ParamX ValueX
 
+floating note
+  Line 1
+  Line 2
+  Line 3
+endnote
+
 state "x-outer" as X_Outer <<sdlreceive>> {
   state "x-inner" as X_Inner : X
+}
+
+partition "X" {
+  if (A == B1) then (true)
+    #Red:C1;
+  else if (A == B2) then (true)
+    #Red:C2;
+  else (false)
+    #Red:C3;
+  endif
 }
 
 @enduml

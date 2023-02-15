@@ -354,8 +354,11 @@ func parseNoteNode(s *scanner) (*NoteNode, error) {
 
 	var node NoteNode
 
+	p := s.p
+
 	s.pushTrackedRange()
 	defer func() {
+		s.trackRange(s.sr([2]int{p, s.p}))
 		node.SetSourceRange(s.popTrackedRange())
 	}()
 
@@ -497,9 +500,11 @@ func parseIfNode(s *scanner) (*IfNode, error) {
 		node.SetSourceRange(s.popTrackedRange())
 	}()
 
-	if tk := getToken(s, nil); tk == nil || tk.str != "if" {
+	ifToken := getToken(s, nil)
+	if ifToken == nil || ifToken.str != "if" {
 		return nil, s.rerr(fmt.Errorf("parseIfNode: expected `if'"))
 	}
+	s.trackTokenRange(ifToken)
 
 	s.ws()
 
@@ -515,6 +520,7 @@ func parseIfNode(s *scanner) (*IfNode, error) {
 	if thenToken == nil || thenToken.str != "then" {
 		return nil, s.rerr(fmt.Errorf("parseIfNode: expected `then'"))
 	}
+	s.trackTokenRange(thenToken)
 
 	s.ws()
 
@@ -531,6 +537,7 @@ func parseIfNode(s *scanner) (*IfNode, error) {
 
 		switch {
 		case tk.str == "endif":
+			s.trackTokenRange(tk)
 			return &node, nil
 		case tk.str == "else":
 			s.moveTo(tk)
@@ -541,6 +548,7 @@ func parseIfNode(s *scanner) (*IfNode, error) {
 			}
 			node.Else = *elseNode
 		case tk.str == "end":
+			s.trackTokenRange(tk)
 			node.Statements = append(node.Statements, EndNode{})
 		case tk.str == "floating", tk.str == "note":
 			s.moveTo(tk)
@@ -615,9 +623,11 @@ func parseElseNode(s *scanner) (*ElseNode, error) {
 		node.SetSourceRange(s.popTrackedRange())
 	}()
 
-	if tk := getToken(s, nil); tk == nil || tk.str != "else" {
+	elseToken := getToken(s, nil)
+	if elseToken == nil || elseToken.str != "else" {
 		return nil, s.rerr(fmt.Errorf("parseElseNode: expected `else'"))
 	}
+	s.trackTokenRange(elseToken)
 
 	s.ws()
 
@@ -637,6 +647,7 @@ func parseElseNode(s *scanner) (*ElseNode, error) {
 			if thenToken == nil || thenToken.str != "then" {
 				return nil, s.rerr(fmt.Errorf("parseElseNode: expected `then'"))
 			}
+			s.trackTokenRange(thenToken)
 
 			s.ws()
 		} else {
@@ -742,12 +753,14 @@ func parseForkNode(s *scanner) (*ForkNode, error) {
 		node.SetSourceRange(s.popTrackedRange())
 	}()
 
-	if tk := getToken(s, nil); tk == nil || (tk.str != "fork" && tk.str != "forkagain") {
-		return nil, s.rerr(fmt.Errorf("parseForkNode: expected `fork' or `forkagain'; got %#v", tk))
-	} else {
-		if tk != nil && tk.str == "forkagain" {
-			node.IsAgain = true
-		}
+	forkToken := getToken(s, nil)
+	if forkToken == nil || (forkToken.str != "fork" && forkToken.str != "forkagain") {
+		return nil, s.rerr(fmt.Errorf("parseForkNode: expected `fork' or `forkagain'; got %#v", forkToken))
+	}
+	s.trackTokenRange(forkToken)
+
+	if forkToken.str == "forkagain" {
+		node.IsAgain = true
 	}
 
 	for !s.eof() {
@@ -757,6 +770,7 @@ func parseForkNode(s *scanner) (*ForkNode, error) {
 
 		switch {
 		case tk.str == "endfork":
+			s.trackTokenRange(tk)
 			return &node, nil
 		case tk.str == "forkagain":
 			s.moveTo(tk)
@@ -768,6 +782,7 @@ func parseForkNode(s *scanner) (*ForkNode, error) {
 			node.ForkAgain = *forkAgainNode
 			return &node, nil
 		case tk.str == "end":
+			s.trackTokenRange(tk)
 			node.Statements = append(node.Statements, EndNode{})
 		case tk.str == "partition":
 			s.moveTo(tk)
@@ -820,6 +835,8 @@ func parseParenthesisNode(s *scanner) (*ParenthesisNode, error) {
 		node.SetSourceRange(s.popTrackedRange())
 	}()
 
+	p := s.pos()
+
 	leftParenthesisCharacter := s.byte()
 	if leftParenthesisCharacter != '(' {
 		return nil, s.rerr(fmt.Errorf("parseParenthesisNode: expected opening parenthesis, got %#v", leftParenthesisCharacter))
@@ -851,6 +868,8 @@ func parseParenthesisNode(s *scanner) (*ParenthesisNode, error) {
 
 	node.Content = string(content)
 
+	s.trackRange(s.sr([2]int{p, s.pos() - 1}))
+
 	return &node, nil
 }
 
@@ -868,6 +887,7 @@ func parseActionNode(s *scanner) (*ActionNode, error) {
 	if startToken == nil {
 		return nil, s.rerr(fmt.Errorf("parseActionNode: expected valid action start token (: or #)"))
 	}
+	s.trackTokenRange(startToken)
 
 	if startToken.typ == tokenTypeHash {
 		var colour []byte
@@ -888,22 +908,26 @@ func parseActionNode(s *scanner) (*ActionNode, error) {
 		if startToken == nil {
 			return nil, s.rerr(fmt.Errorf("parseActionNode: expected valid action start token (:) but got none"))
 		}
+		s.trackTokenRange(startToken)
 	}
 
 	if startToken.typ != tokenTypeColon {
 		return nil, s.rerr(fmt.Errorf("parseActionNode: expected valid action start token (:); got %#v", startToken))
 	}
 
+	p := s.pos()
 	content, ok := readToTerminator(s, ';', false)
 	if !ok {
 		return nil, s.rerr(fmt.Errorf("parseActionNode: couldn't get action content"))
 	}
+	s.trackRange(s.sr([2]int{p, s.pos() - 1}))
 	node.Content = content
 
 	endToken := getToken(s, nil)
 	if endToken == nil || endToken.typ != tokenTypeSemi {
 		return nil, s.rerr(fmt.Errorf("parseActionNode: expected valid action end token (;) but got %s", endToken))
 	}
+	s.trackTokenRange(endToken)
 
 	return &node, nil
 }
