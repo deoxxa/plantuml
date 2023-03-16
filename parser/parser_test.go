@@ -92,6 +92,19 @@ func TestParser(t *testing.T) {
   a.Equal("", doc.GetSkinParam("Param3"))
 }
 
+func TestParserComments(t *testing.T) {
+  a := assert.New(t)
+
+  doc, err := parseDocument(&scanner{d: readTestFile("simple-code-1-comments-input.uml")})
+  a.NoError(err)
+  a.NotNil(doc)
+
+  a.Equal("Begin", doc.FindInitialState().Name)
+  a.Equal("Value1", doc.GetSkinParam("Param1"))
+  a.Equal("Value2", doc.GetSkinParam("Param2"))
+  a.Equal("", doc.GetSkinParam("Param3"))
+}
+
 func BenchmarkParser(b *testing.B) {
   for i := 0; i < b.N; i++ {
     parseDocument(&scanner{d: readTestFile("simple-code-1-input.uml")})

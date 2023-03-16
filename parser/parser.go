@@ -65,6 +65,19 @@ func getToken(s *scanner, opts *options) *token {
 		return nil
 	}
 
+	// skip comments
+	if s.peek() == '\'' {
+		s.move(1)
+
+		for !s.eof() {
+			if s.byte() == '\n' {
+				break
+			}
+		}
+
+		return getToken(s, opts)
+	}
+
 	if c := s.peek(); c == '\n' {
 		p := s.p
 		s.move(1)
