@@ -1,0 +1,23 @@
+line 1
+
+line 2
+
+open paren (
+  indent 1
+) close paren
+
+open brace {
+  indent 1
+} close brace
+
+open bracket [
+  indent 1
+] close bracket
+
+open paren1 (
+  indent 1
+  open paren2 (
+    indent 2
+  )
+  indent 1
+)

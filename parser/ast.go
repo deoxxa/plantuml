@@ -7,6 +7,10 @@ import (
 
 type SourcePosition struct{ Offset, Line, Column int }
 
+func (p SourcePosition) String() string {
+	return fmt.Sprintf("%d:%d", p.Line, p.Column)
+}
+
 func (p SourcePosition) Before(other SourcePosition) bool {
 	return p.Offset < other.Offset
 }
@@ -17,20 +21,32 @@ func (p SourcePosition) After(other SourcePosition) bool {
 
 type SourceRange struct{ Start, End SourcePosition }
 
+func (r SourceRange) String() string {
+	return fmt.Sprintf("%s-%s", r.Start.String(), r.End.String())
+}
+
+func (r *SourceRange) Expand(other SourceRange) {
+	if other.Start.Offset < r.Start.Offset {
+		r.Start.Offset = other.Start.Offset
+		r.Start.Line = other.Start.Line
+		r.Start.Column = other.Start.Column
+	}
+	if other.End.Offset > r.End.Offset {
+		r.End.Offset = other.End.Offset
+		r.End.Line = other.End.Line
+		r.End.Column = other.End.Column
+	}
+}
+
 func MergeRanges(a []SourceRange) SourceRange {
 	if len(a) == 0 {
 		return SourceRange{}
 	}
 
-	var r SourceRange = a[0]
+	r := a[0]
 
 	for _, e := range a {
-		if e.Start.Offset < r.Start.Offset {
-			r.Start = e.Start
-		}
-		if e.End.Offset > r.End.Offset {
-			r.End = e.End
-		}
+		r.Expand(e)
 	}
 
 	return r
@@ -38,6 +54,10 @@ func MergeRanges(a []SourceRange) SourceRange {
 
 type BaseNode struct {
 	SourceRange SourceRange
+}
+
+func (b BaseNode) Walk(fn func(n Node) error) error {
+	return nil
 }
 
 func (b BaseNode) GetSourcePosition() SourcePosition {
@@ -61,7 +81,7 @@ func (b *BaseNode) SetSourceEnd(position SourcePosition) {
 }
 
 type Node interface {
-	IsNode()
+	NodeName() string
 }
 
 type DocumentNode struct {
@@ -69,12 +89,22 @@ type DocumentNode struct {
 	Nodes []Node
 }
 
-func (DocumentNode) IsNode() {}
+func (DocumentNode) NodeName() string { return "DocumentNode" }
 
-func (d DocumentNode) FindNode(fn func(n Node) bool) Node {
-	for _, node := range d.Nodes {
-		if fn(node) {
-			return node
+func (n DocumentNode) Walk(fn func(n Node) error) error {
+	for i := range n.Nodes {
+		if err := fn(n.Nodes[i]); err != nil {
+			return fmt.Errorf("DocumentNode.Walk: could not walk Nodes[%d]: %w", i, err)
+		}
+	}
+
+	return nil
+}
+
+func (n DocumentNode) FindNode(fn func(n Node) bool) Node {
+	for i := range n.Nodes {
+		if fn(n.Nodes[i]) {
+			return n.Nodes[i]
 		}
 	}
 
@@ -139,7 +169,7 @@ type CommentNode struct {
 	Content string
 }
 
-func (CommentNode) IsNode() {}
+func (CommentNode) NodeName() string { return "CommentNode" }
 
 type StateNode struct {
 	BaseNode
@@ -150,7 +180,17 @@ type StateNode struct {
 	Children   []Node
 }
 
-func (StateNode) IsNode() {}
+func (StateNode) NodeName() string { return "StateNode" }
+
+func (n StateNode) Walk(fn func(n Node) error) error {
+	for i := range n.Children {
+		if err := fn(n.Children[i]); err != nil {
+			return fmt.Errorf("StateNode.Walk: could not walk Children[%d]: %w", i, err)
+		}
+	}
+
+	return nil
+}
 
 func (n StateNode) GetEntryConditions() []StateNode {
 	return n.getChildrenWithPrefix("Entry Condition")
@@ -193,7 +233,7 @@ type EdgeNode struct {
 	Text      string
 }
 
-func (EdgeNode) IsNode() {}
+func (EdgeNode) NodeName() string { return "EdgeNode" }
 
 type SkinParamNode struct {
 	BaseNode
@@ -201,13 +241,13 @@ type SkinParamNode struct {
 	Value string
 }
 
-func (SkinParamNode) IsNode() {}
+func (SkinParamNode) NodeName() string { return "SkinParamNode" }
 
 type SeparatorNode struct {
 	BaseNode
 }
 
-func (SeparatorNode) IsNode() {}
+func (SeparatorNode) NodeName() string { return "SeparatorNode" }
 
 type NoteNode struct {
 	BaseNode
@@ -216,7 +256,7 @@ type NoteNode struct {
 	Content  string
 }
 
-func (NoteNode) IsNode() {}
+func (NoteNode) NodeName() string { return "NoteNode" }
 
 type PartitionNode struct {
 	BaseNode
@@ -224,7 +264,17 @@ type PartitionNode struct {
 	Children []Node
 }
 
-func (PartitionNode) IsNode() {}
+func (PartitionNode) NodeName() string { return "PartitionNode" }
+
+func (n PartitionNode) Walk(fn func(n Node) error) error {
+	for i := range n.Children {
+		if err := fn(n.Children[i]); err != nil {
+			return fmt.Errorf("PartitionNode.Walk: could not walk Children[%d]: %w", i, err)
+		}
+	}
+
+	return nil
+}
 
 type IfNode struct {
 	BaseNode
@@ -234,7 +284,35 @@ type IfNode struct {
 	Else       Node
 }
 
-func (IfNode) IsNode() {}
+func (IfNode) NodeName() string { return "IfNode" }
+
+func (n IfNode) Walk(fn func(n Node) error) error {
+	if n.Condition != nil {
+		if err := fn(n.Condition); err != nil {
+			return fmt.Errorf("IfNode.Walk: could not walk Condition: %w", err)
+		}
+	}
+
+	if n.Value != nil {
+		if err := fn(n.Value); err != nil {
+			return fmt.Errorf("IfNode.Walk: could not walk Value: %w", err)
+		}
+	}
+
+	for i := range n.Statements {
+		if err := fn(n.Statements[i]); err != nil {
+			return fmt.Errorf("IfNode.Walk: could not walk Statements[%d]: %w", i, err)
+		}
+	}
+
+	if n.Else != nil {
+		if err := fn(n.Else); err != nil {
+			return fmt.Errorf("IfNode.Walk: could not walk Else: %w", err)
+		}
+	}
+
+	return nil
+}
 
 type ElseNode struct {
 	BaseNode
@@ -244,14 +322,42 @@ type ElseNode struct {
 	Else       Node
 }
 
-func (ElseNode) IsNode() {}
+func (ElseNode) NodeName() string { return "ElseNode" }
+
+func (n ElseNode) Walk(fn func(n Node) error) error {
+	if n.Condition != nil {
+		if err := fn(n.Condition); err != nil {
+			return fmt.Errorf("ElseNode.Walk: could not walk Condition: %w", err)
+		}
+	}
+
+	if n.Value != nil {
+		if err := fn(n.Value); err != nil {
+			return fmt.Errorf("ElseNode.Walk: could not walk Value: %w", err)
+		}
+	}
+
+	for i := range n.Statements {
+		if err := fn(n.Statements[i]); err != nil {
+			return fmt.Errorf("ElseNode.Walk: could not walk Statements[%d]: %w", i, err)
+		}
+	}
+
+	if n.Else != nil {
+		if err := fn(n.Else); err != nil {
+			return fmt.Errorf("ElseNode.Walk: could not walk Else: %w", err)
+		}
+	}
+
+	return nil
+}
 
 type ParenthesisNode struct {
 	BaseNode
 	Content string
 }
 
-func (ParenthesisNode) IsNode() {}
+func (ParenthesisNode) NodeName() string { return "ParenthesisNode" }
 
 type ForkNode struct {
 	BaseNode
@@ -260,7 +366,23 @@ type ForkNode struct {
 	ForkAgain  Node
 }
 
-func (ForkNode) IsNode() {}
+func (ForkNode) NodeName() string { return "ForkNode" }
+
+func (n ForkNode) Walk(fn func(n Node) error) error {
+	for i := range n.Statements {
+		if err := fn(n.Statements[i]); err != nil {
+			return fmt.Errorf("ForkNode.Walk: could not walk Statements[%d]: %w", i, err)
+		}
+	}
+
+	if n.ForkAgain != nil {
+		if err := fn(n.ForkAgain); err != nil {
+			return fmt.Errorf("ForkNode.Walk: could not walk ForkAgain: %w", err)
+		}
+	}
+
+	return nil
+}
 
 type ActionNode struct {
 	BaseNode
@@ -268,109 +390,16 @@ type ActionNode struct {
 	Content string
 }
 
-func (ActionNode) IsNode() {}
+func (ActionNode) NodeName() string { return "ActionNode" }
 
 type StartNode struct {
 	BaseNode
 }
 
-func (StartNode) IsNode() {}
+func (StartNode) NodeName() string { return "StartNode" }
 
 type EndNode struct {
 	BaseNode
 }
 
-func (EndNode) IsNode() {}
-
-func Walk(n Node, fn func(n Node) error) error {
-	if err := fn(n); err != nil {
-		return err
-	}
-
-	switch n := n.(type) {
-	case DocumentNode:
-		for _, nn := range n.Nodes {
-			if err := Walk(nn, fn); err != nil {
-				return err
-			}
-		}
-	case CommentNode:
-	case StateNode:
-		for _, nn := range n.Children {
-			if err := Walk(nn, fn); err != nil {
-				return err
-			}
-		}
-	case EdgeNode:
-	case SkinParamNode:
-	case SeparatorNode:
-	case NoteNode:
-	case PartitionNode:
-		for _, nn := range n.Children {
-			if err := Walk(nn, fn); err != nil {
-				return err
-			}
-		}
-	case IfNode:
-		if n.Condition != nil {
-			if err := Walk(n.Condition, fn); err != nil {
-				return err
-			}
-		}
-		if n.Value != nil {
-			if err := Walk(n.Value, fn); err != nil {
-				return err
-			}
-		}
-		for _, nn := range n.Statements {
-			if err := Walk(nn, fn); err != nil {
-				return err
-			}
-		}
-		if n.Else != nil {
-			if err := Walk(n.Else, fn); err != nil {
-				return err
-			}
-		}
-	case ElseNode:
-		if n.Condition != nil {
-			if err := Walk(n.Condition, fn); err != nil {
-				return err
-			}
-		}
-		if n.Value != nil {
-			if err := Walk(n.Value, fn); err != nil {
-				return err
-			}
-		}
-		for _, nn := range n.Statements {
-			if err := Walk(nn, fn); err != nil {
-				return err
-			}
-		}
-		if n.Else != nil {
-			if err := Walk(n.Else, fn); err != nil {
-				return err
-			}
-		}
-	case ParenthesisNode:
-	case ForkNode:
-		for _, nn := range n.Statements {
-			if err := Walk(nn, fn); err != nil {
-				return err
-			}
-		}
-		if n.ForkAgain != nil {
-			if err := Walk(n.ForkAgain, fn); err != nil {
-				return err
-			}
-		}
-	case ActionNode:
-	case StartNode:
-	case EndNode:
-	default:
-		return fmt.Errorf("invalid node type %T", n)
-	}
-
-	return nil
-}
+func (EndNode) NodeName() string { return "EndNode" }

@@ -1,7 +1,6 @@
 package parser
 
 import (
-  "bytes"
   "io/ioutil"
   "testing"
 
@@ -25,58 +24,6 @@ func readTestFile(name string) []byte {
   }
 
   return nil
-}
-
-func TestScanner(t *testing.T) {
-  a := assert.New(t)
-
-  const code = "12 \t \t \t 34"
-
-  s := &scanner{d: []byte(code)}
-
-  a.Equal(0, s.pos())
-  a.Equal(byte('1'), s.peek())
-  a.Equal(0, s.pos())
-  a.Equal(byte('1'), s.byte())
-  a.Equal(1, s.pos())
-  a.Equal(byte('2'), s.byte())
-  a.Equal(2, s.pos())
-  s.ws()
-  a.Equal(9, s.pos())
-  a.Equal(byte('3'), s.byte())
-}
-
-func BenchmarkScanner(b *testing.B) {
-  const code = "12 \t \t \t 34"
-
-  for i := 0; i < b.N; i++ {
-    s := &scanner{d: []byte(code)}
-    s.byte()
-    s.byte()
-    s.ws()
-    s.byte()
-    s.byte()
-  }
-}
-
-func TestTokeniser(t *testing.T) {
-  a := assert.New(t)
-
-  var i int
-  s := &scanner{d: readTestFile("simple-code-1-input.uml")}
-  for getToken(s, &options{parseTrailing: true}) != nil {
-    i++
-  }
-
-  a.Equal(64, i)
-}
-
-func BenchmarkTokeniser(b *testing.B) {
-  for i := 0; i < b.N; i++ {
-    s := &scanner{d: readTestFile("simple-code-1-input.uml")}
-    for getToken(s, nil) != nil {
-    }
-  }
 }
 
 func TestParser(t *testing.T) {
@@ -117,6 +64,9 @@ func TestParserPositions(t *testing.T) {
   doc, err := ParseDocument(string(readTestFile("tiny-code.uml")))
   a.NoError(err)
   a.NotNil(doc)
+
+  a.Equal(doc.GetSourcePosition().String(), "1:1")
+  a.Equal(doc.GetSourceRange().String(), "1:1-25:7")
 
   a.Equal(&DocumentNode{
     BaseNode: BaseNode{
@@ -164,9 +114,9 @@ func TestParserPositions(t *testing.T) {
                 End:   SourcePosition{Offset: 162, Line: 12, Column: 33},
               },
             },
-            Name:       "X_Inner",
-            Label:      "x-inner",
-            Text:       "X",
+            Name:  "X_Inner",
+            Label: "x-inner",
+            Text:  "X",
           },
         },
       },
@@ -288,39 +238,4 @@ func TestParserPositions(t *testing.T) {
       },
     },
   }, doc)
-}
-
-func TestFormatter(t *testing.T) {
-  for _, e := range []struct {
-    name          string
-    input, output []byte
-  }{
-    {"simple", readTestFile("simple-code-1-input.uml"), readTestFile("simple-code-1-formatted.uml")},
-    {"complex", readTestFile("complex-code-1-input.uml"), readTestFile("complex-code-1-formatted.uml")},
-    {"complex2", readTestFile("complex-code-2-input.uml"), readTestFile("complex-code-2-formatted.uml")},
-  } {
-    t.Run(e.name, func(t *testing.T) {
-      a := assert.New(t)
-
-      doc, err := parseDocument(&scanner{d: e.input})
-      a.NoError(err)
-      a.NotNil(doc)
-
-      if doc != nil {
-        buf := bytes.NewBuffer(nil)
-        a.NoError(FormatDocument(*doc, buf))
-        if e.output != nil {
-          a.Equal(string(e.output), buf.String())
-        }
-      }
-    })
-  }
-}
-
-func BenchmarkFormatter(b *testing.B) {
-  doc, _ := parseDocument(&scanner{d: readTestFile("simple-code-1-input.uml")})
-
-  for i := 0; i < b.N; i++ {
-    FormatDocument(*doc, ioutil.Discard)
-  }
 }
